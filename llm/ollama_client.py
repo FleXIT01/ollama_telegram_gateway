@@ -10,10 +10,7 @@ async def chat(
     tools: list[dict] | None = None,
     model: str | None = None,
 ) -> dict:
-    """
-    Send a chat request to Ollama. Returns {"content": str} for text replies
-    or {"tool_calls": [...]} for tool call requests.
-    """
+    """Send a chat request to Ollama. Returns {"content": str} or {"tool_calls": [...]}."""
     payload = {
         "model": model or OLLAMA_MODEL,
         "messages": messages,
@@ -22,10 +19,19 @@ async def chat(
     if tools:
         payload["tools"] = tools
 
-    async with httpx.AsyncClient(timeout=float(TOOL_TIMEOUT * 3)) as client:
-        resp = await client.post(f"{OLLAMA_HOST}/api/chat", json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=float(TOOL_TIMEOUT * 3)) as client:
+            resp = await client.post(f"{OLLAMA_HOST}/api/chat", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.ConnectError:
+        raise ConnectionError(f"Cannot connect to Ollama at {OLLAMA_HOST}. Is it running?")
+    except httpx.HTTPStatusError as e:
+        raise ConnectionError(f"Ollama error ({e.response.status_code}): {e.response.text[:500]}")
+    except httpx.TimeoutException:
+        raise ConnectionError(f"Ollama timed out after {TOOL_TIMEOUT * 3}s")
+    except httpx.HTTPError as e:
+        raise ConnectionError(f"Ollama request failed: {e}")
 
     msg = data.get("message", {})
     tool_calls = msg.get("tool_calls")
@@ -35,9 +41,10 @@ async def chat(
         for tc in tool_calls:
             func = tc.get("function", {})
             name = func.get("name", "")
+            raw_args = func.get("arguments", "{}")
             try:
-                arguments = json.loads(func.get("arguments", "{}"))
-            except json.JSONDecodeError:
+                arguments = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except (json.JSONDecodeError, TypeError):
                 arguments = {}
             parsed.append({"name": name, "arguments": arguments})
         logger.info(f"LLM requested tool calls: {[t['name'] for t in parsed]}")

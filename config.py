@@ -1,8 +1,10 @@
 import os
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def _get_list(key: str, default: str = "") -> list[int]:
@@ -13,6 +15,11 @@ def _get_list(key: str, default: str = "") -> list[int]:
 
 
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+if not TELEGRAM_BOT_TOKEN:
+    raise RuntimeError(
+        "TELEGRAM_BOT_TOKEN is not set. Copy .env.example to .env and add your token from @BotFather."
+    )
+
 ALLOWED_USERS: list[int] = _get_list("ALLOWED_USERS")
 
 LLM_BACKEND: str = os.getenv("LLM_BACKEND", "ollama")

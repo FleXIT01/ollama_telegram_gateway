@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from config import MAX_HISTORY, logger
 
@@ -18,20 +17,22 @@ def add_message(chat_id: int, role: str, content: str) -> None:
 
 
 def add_tool_call(chat_id: int, tool_name: str, arguments: dict, result: str) -> None:
-    """Add a tool call + result as messages in Ollama/OpenAI format."""
-    call_id = f"call_{len(_conversations[chat_id])}"
+    """Add a tool call + result as messages in Ollama format.
+
+    Ollama uses dict arguments (not JSON strings like OpenAI).
+    """
     _conversations[chat_id].append({
         "role": "assistant",
-        "content": None,
+        "content": "",
         "tool_calls": [{
-            "id": call_id,
-            "type": "function",
-            "function": {"name": tool_name, "arguments": json.dumps(arguments)},
+            "function": {
+                "name": tool_name,
+                "arguments": arguments,
+            },
         }],
     })
     _conversations[chat_id].append({
         "role": "tool",
-        "tool_call_id": call_id,
         "content": result,
     })
     if len(_conversations[chat_id]) > MAX_HISTORY:

@@ -1,12 +1,12 @@
 TOOL_NAME = "crypto_price"
-TOOL_DESCRIPTION = "Get current cryptocurrency prices from Binance public API. Supports BTC, ETH, SOL, and many more. Use when the user asks about crypto prices or wants to check the market."
+TOOL_DESCRIPTION = "Get current cryptocurrency prices from CoinGecko. Supports BTC, ETH, SOL, DOGE, ADA, XRP and many more. Use when the user asks about crypto prices."
 
 TOOL_PARAMETERS = {
     "type": "object",
     "properties": {
         "symbol": {
             "type": "string",
-            "description": "The cryptocurrency symbol (e.g. BTC, ETH, SOL, DOGE, ADA). Case-insensitive."
+            "description": "The cryptocurrency symbol (e.g. BTC, ETH, SOL, DOGE). Case-insensitive."
         },
         "vs_currency": {
             "type": "string",
@@ -16,56 +16,62 @@ TOOL_PARAMETERS = {
     "required": ["symbol"]
 }
 
+SYMBOL_MAP = {
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+    "DOGE": "dogecoin", "ADA": "cardano", "XRP": "ripple",
+    "DOT": "polkadot", "AVAX": "avalanche-2", "LINK": "chainlink",
+    "UNI": "uniswap", "SHIB": "shiba-inu", "LTC": "litecoin",
+    "BCH": "bitcoin-cash", "ATOM": "cosmos", "NEAR": "near",
+    "PEPE": "pepe", "SUI": "sui", "OP": "optimism",
+    "ARB": "arbitrum", "APT": "aptos", "INJ": "injective-protocol",
+    "SEI": "sei-network", "TIA": "celestia", "WIF": "dogwifcoin",
+}
+
 
 async def run(symbol: str, vs_currency: str = "usd") -> str:
     import httpx
 
     symbol = symbol.upper().strip()
     vs_currency = vs_currency.lower().strip()
+    coin_id = SYMBOL_MAP.get(symbol, symbol.lower())
 
-    symbol_map = {
-        "BTC": "bitcoin",
-        "ETH": "ethereum",
-        "SOL": "solana",
-        "DOGE": "dogecoin",
-        "ADA": "cardano",
-        "XRP": "ripple",
-        "DOT": "polkadot",
-        "MATIC": "matic-network",
-        "AVAX": "avalanche-2",
-        "LINK": "chainlink",
-        "UNI": "uniswap",
-        "SHIB": "shiba-inu",
-        "LTC": "litecoin",
-        "BCH": "bitcoin-cash",
-        "ATOM": "cosmos",
-        "NEAR": "near",
-        "PEPE": "pepe",
-    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                "https://api.coingecko.com/api/v3/simple/price",
+                params={
+                    "ids": coin_id,
+                    "vs_currencies": vs_currency,
+                    "include_24hr_change": "true",
+                },
+            )
+            if resp.status_code == 429:
+                return "CoinGecko rate limit reached. Please wait 60 seconds."
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as e:
+        return f"Error fetching price: {e}"
+    except Exception as e:
+        return f"Unexpected error: {e}"
 
-    coin_id = symbol_map.get(symbol, symbol.lower())
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(
-            "https://api.coingecko.com/api/v3/simple/price",
-            params={
-                "ids": coin_id,
-                "vs_currencies": vs_currency,
-                "include_24hr_change": "true",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-    if coin_id not in data:
-        return f"Could not find price for {symbol}. Try using the full CoinGecko ID."
+    if coin_id not in data or not data[coin_id]:
+        return f"Could not find price for '{symbol}'. Check the symbol or try the full CoinGecko coin ID (e.g., 'bitcoin')."
 
     info = data[coin_id]
-    price = info.get(vs_currency, "N/A")
-    change_24h = info.get(f"{vs_currency}_24h_change", None)
+    price = info.get(vs_currency)
+    if price is None:
+        return f"No {vs_currency.upper()} price available for {symbol}."
 
-    msg = f"{symbol} = ${price:,.4f}" if isinstance(price, (int, float)) else f"{symbol} = {price}"
-    if isinstance(change_24h, (int, float)):
+    change_24h = info.get(f"{vs_currency}_24h_change")
+
+    if price >= 1:
+        msg = f"{symbol} = ${price:,.2f}"
+    elif price >= 0.01:
+        msg = f"{symbol} = ${price:.4f}"
+    else:
+        msg = f"{symbol} = ${price:.8f}"
+
+    if change_24h is not None:
         direction = "+" if change_24h >= 0 else ""
         msg += f" (24h: {direction}{change_24h:.2f}%)"
 
