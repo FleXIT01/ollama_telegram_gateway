@@ -1,7 +1,7 @@
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from config import TELEGRAM_BOT_TOKEN, LLM_BACKEND, OLLAMA_HOST, LMSTUDIO_HOST, logger
-from bot.handlers import start, handle_message, list_tools, handle_non_text
+from bot.handlers import start, handle_message, list_tools, handle_non_text, handle_tool_callback
 from tools.manager import discover_tools
 import os
 
@@ -19,6 +19,7 @@ def main():
     app.add_handler(CommandHandler("tools", list_tools))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(~filters.TEXT & ~filters.COMMAND, handle_non_text))
+    app.add_handler(CallbackQueryHandler(handle_tool_callback))
 
     logger.info("Bot is running. Press Ctrl+C to stop.")
     app.run_polling()

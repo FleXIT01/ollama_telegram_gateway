@@ -21,6 +21,11 @@ if not TELEGRAM_BOT_TOKEN:
     )
 
 ALLOWED_USERS: list[int] = _get_list("ALLOWED_USERS")
+if not ALLOWED_USERS:
+    logging.getLogger("telegram_ai_gateway").warning(
+        "ALLOWED_USERS is empty — the bot will answer EVERY Telegram user. "
+        "Set ALLOWED_USERS=<your_id>,<other_id> in .env to restrict access."
+    )
 
 LLM_BACKEND: str = os.getenv("LLM_BACKEND", "ollama")
 
@@ -31,6 +36,7 @@ LMSTUDIO_HOST: str = os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
 LMSTUDIO_MODEL: str = os.getenv("LMSTUDIO_MODEL", "local-model")
 
 TOOL_TIMEOUT: int = int(os.getenv("TOOL_TIMEOUT", "30"))
+RUN_COMMAND_ALLOWLIST: str = os.getenv("RUN_COMMAND_ALLOWLIST", "")
 TOOL_CONFIRMATION: bool = os.getenv("TOOL_CONFIRMATION", "false").lower() == "true"
 MAX_HISTORY: int = int(os.getenv("MAX_HISTORY", "50"))
 

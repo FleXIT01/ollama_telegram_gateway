@@ -47,3 +47,22 @@ ALLOWED_USERS=123456789,987654321
 
 ```
 
+If `ALLOWED_USERS` is empty, the bot answers every Telegram user (a warning is logged at startup).
+
+**Optional: Require tool confirmation**
+With `TOOL_CONFIRMATION=true`, every tool call must first be approved in chat via ✅/❌ buttons
+before it runs:
+
+```env
+TOOL_CONFIRMATION=true
+```
+
+**Tool safety: `run_command`**
+The `run_command` tool only executes whitelisted, read-only PowerShell commands
+(`ipconfig`, `tasklist`, `dir`, …). Command chaining (`;`, `|`, `&`, `>`) is blocked.
+Extend the whitelist via `.env`:
+
+```env
+RUN_COMMAND_ALLOWLIST=get-service,whoami
+```
+
